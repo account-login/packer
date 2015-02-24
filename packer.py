@@ -3,7 +3,7 @@
 
 # apt-get install p7zip-full rar zip unzip tar gzip bzip2 xz-utils lzma lzip lzop
 
-# TODO: stdin, stdout
+# TODO: --best option
 
 from __future__ import print_function, unicode_literals
 
@@ -112,18 +112,26 @@ def pack_filter(args):
         opt += shlex.split(args.extra_opt)
         
     compressor = local[suf2filter[args.format]]
-    if len(args.inputs) != 1:
-        retcode_final = 0
-        for x in args.inputs:
-            outfile = x+'.'+args.format
-            cmd = (compressor[opt] < x) > outfile
-            retcode = run_cmd(cmd, args.verbosity)
-            if retcode != 0:
-                retcode_final = retcode
-        return retcode_final
-    else:
-        cmd = (compressor[opt] < args.inputs[0]) > args.archive
-        return run_cmd(cmd, args.verbosity)
+    
+    retcode_final = 0
+    for x in args.inputs:
+        if len(args.inputs) == 1:
+            outfile = args.archive
+        else:   # multiple inputs
+            if x == '-':
+                outfile = '-'
+            else:
+                outfile = x+'.'+args.format
+                
+        cmd = compressor[opt]
+        if x != '-':
+            cmd = cmd < x
+        if outfile != '-':
+            cmd = cmd > outfile
+        retcode = run_cmd(cmd, args.verbosity)
+        if retcode != 0:
+            retcode_final = retcode
+    return retcode_final
         
 def pack_7z_common(args, cmd_bin):
     sevenz = local[cmd_bin]
@@ -301,7 +309,11 @@ def unpack_filter(args):
     if args.extra_opt is not None:
         opt += shlex.split(args.extra_opt)
 
-    cmd = (filter_cmd[opt] < args.archive) > args.output
+    cmd = filter_cmd[opt]
+    if args.archive != '-':
+        cmd = cmd < args.archive
+    if args.output != '-':
+        cmd = cmd > args.output
     return run_cmd(cmd, args.verbosity)
 
 def unpack_7z_rar_common(args, cmd_bin, rar):
@@ -484,7 +496,10 @@ def main():
         if args.archive is None:
             if len(args.inputs) == 1:
                 # guess archive name by input file name
-                args.archive = args.inputs[0] + '.' + args.format
+                if args.inputs[0] == '-':
+                    args.archive = '-'
+                else:
+                    args.archive = args.inputs[0] + '.' + args.format
             else:
                 if args.format not in filter_type:
                     # guess archive name by cwd
