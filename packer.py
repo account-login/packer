@@ -4,6 +4,7 @@
 # apt-get install p7zip-full rar zip unzip tar gzip bzip2 xz-utils lzma lzip lzop
 
 # TODO: --best option
+# TODO: unpacker.py
 
 from __future__ import print_function, unicode_literals
 
@@ -16,6 +17,8 @@ class ParseError(Exception):
     pass
 
 class SilentArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwds):
+        super().__init__(formatter_class=argparse.RawDescriptionHelpFormatter, *args, **kwds)
     def error(self, message):
         raise ParseError('not match')
     def user_error(self, msg):
@@ -427,7 +430,13 @@ def view(args):
 
 def main():
     # packer file1 [file2]... [--to output] [--format tgz]
-    ps1 = SilentArgumentParser()
+    ps1 = SilentArgumentParser(description='compress files.\n'
+                               'examples:\n'
+                               '    packer 1.txt 2.txt --to archive.7z\n'
+                               '    packer 1.txt 2.txt --to archive.tar.gz --format=tar.gz\n'
+                               '    packer 1.txt 2.txt --format gz                # got 1.txt.gz, 2.txt.gz\n'
+                               '    cat file | packer - --format xz > file.xz     # read from stdin\n'
+                               '\n')
     ps1.add_argument('inputs', nargs='+')
     ps1.add_argument('--to', metavar='ARCHIVE', dest='archive')
 
@@ -437,12 +446,17 @@ def main():
 #     ps2.add_argument('--with', nargs='+', metavar='INPUT', required=True, dest='inputs')
     
     # packer -x archive --to dir/
-    ps3 = SilentArgumentParser()
+    ps3 = SilentArgumentParser(description='decompress archive.\n'
+                               'examples:\n'
+                               '    packer -x archive.tgz\n'
+                               '    packer -x archive.7z --to directory/\n'
+                               '    packer -x archive.gz --to -    # write contents of archive.gz to stdout\n'
+                               '\n')
     ps3.add_argument('-x', '--extract', metavar='ARCHIVE', required=True, dest='archive')
     ps3.add_argument('--to', metavar='OUTPUT', required=False, dest='output')
     
     # packer [--test] archive
-    ps4 = SilentArgumentParser()
+    ps4 = SilentArgumentParser(description='list archive contents, test archive.')
     ps4.add_argument('--test', '-t', action='store_true')
     ps4.add_argument('archive')
     
