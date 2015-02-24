@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# encoding: utf-8
+# -*- coding: utf-8 -*-
 
 # apt-get install p7zip-full rar zip unzip tar gzip bzip2 xz-utils lzma lzip lzop
 
@@ -365,11 +365,20 @@ def unpack(args):
     fmt = format_normalize(fmt)
     # tar, tar.*
     if fmt in {'tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'tar.lzma', 'tar.Z', 'tar.lz', 'tar.lzo'}:
+        if args.output is None:
+            args.output = '.'
         return unpack_tar(args)
     # filter_type = {'gz', 'bz2', 'xz', 'lzma', 'Z', 'lz', 'lzo'}
     elif fmt in filter_type:
+        if args.output is None:
+            if args.archive.endswith('.'+fmt):
+                args.output = args.archive[:-len('.'+fmt)]
+            else:
+                raise Exception('you must specify --to option')
         return unpack_filter(args)
     elif fmt in {'7z', 'rar', 'zip'}:
+        if args.output is None:
+            args.output = '.'
         if args.packer is None:
             for unpacker in format2unpacker[fmt]:
                 try:
@@ -384,6 +393,8 @@ def unpack(args):
             unpacker = getattr(sys.modules[__name__], 'unpack_'+args.packer)
             return unpacker(args)
     elif fmt == 'unknown':
+        if args.output is None:
+            args.output = '.'
         if args.packer is None:
             for unpacker in (unpack_7z, unpack_rar, unpack_winrar):
                 try:
@@ -502,7 +513,7 @@ def main():
         return unpack(args)
     
     # packer [--test] archive
-    # todo
+    # todo:
     
     # all parsers fail to parse, print usage and exit
     for parser in (ps1, ps3, ps4):
@@ -511,5 +522,4 @@ def main():
     
 
 if __name__ == '__main__':
-    import sys
     sys.exit(main())
