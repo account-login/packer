@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # apt-get install p7zip-full rar zip unzip tar gzip bzip2 xz-utils lzma lzip lzop
+# alias unpacker='packer -x'
 
 # TODO: --best option
 # TODO: unpacker.py
