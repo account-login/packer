@@ -9,9 +9,7 @@
 
 from __future__ import print_function, unicode_literals
 
-import argparse
-import shlex
-import sys
+import sys, os, argparse, shlex
 from plumbum import local, CommandNotFound
 
 class ParseError(Exception):
@@ -294,7 +292,14 @@ def identify(filename):
 
 
 ## begin unpack*
+def ensure_output_dir(directory):
+    if directory is None:
+        directory = '.'
+    os.makedirs(directory, exist_ok=True)
+    return directory
+    
 def unpack_tar(args):
+    args.output = ensure_output_dir(args.output)
     tar = local['tar']
     tar_opt = ['xf', args.archive, '-C', args.output]
     # tar bug
@@ -320,6 +325,7 @@ def unpack_filter(args):
     if args.archive != '-':
         cmd = cmd < args.archive
     if args.output != '-':
+        ensure_output_dir(os.path.dirname(args.output))
         cmd = cmd > args.output
     return run_cmd(cmd, args.verbosity)
 
@@ -333,6 +339,7 @@ def unpack_7z_rar_common(args, cmd_bin, rar):
     if args.extra_opt is not None:
         opt += shlex.split(args.extra_opt)
     if args.output is not None:
+        args.output = ensure_output_dir(args.output)
         if rar:
             opt.append(args.output)
         else:
@@ -358,6 +365,7 @@ def unpack_winrar(args):
 
 def unpack_unzip(args):
     unzip_cmd = local['unzip']
+    args.output = ensure_output_dir(args.output)
     opt = ['-d', args.output]
     if args.extra_opt is not None:
         opt += shlex.split(args.extra_opt)
@@ -384,8 +392,6 @@ def unpack(args):
     fmt = format_normalize(fmt)
     # tar, tar.*
     if fmt in {'tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'tar.lzma', 'tar.Z', 'tar.lz', 'tar.lzo'}:
-        if args.output is None:
-            args.output = '.'
         return unpack_tar(args)
     # filter_type = {'gz', 'bz2', 'xz', 'lzma', 'Z', 'lz', 'lzo'}
     elif fmt in filter_type:
@@ -396,8 +402,6 @@ def unpack(args):
                 raise Exception('you must specify --to option')
         return unpack_filter(args)
     elif fmt in {'7z', 'rar', 'zip'}:
-        if args.output is None:
-            args.output = '.'
         if args.packer is None:
             for unpacker in format2unpacker[fmt]:
                 try:
@@ -412,8 +416,6 @@ def unpack(args):
             unpacker = getattr(sys.modules[__name__], 'unpack_'+args.packer)
             return unpacker(args)
     elif fmt == 'unknown':
-        if args.output is None:
-            args.output = '.'
         if args.packer is None:
             for unpacker in (unpack_7z, unpack_rar, unpack_winrar):
                 try:
@@ -523,7 +525,6 @@ def main():
             else:
                 if args.format not in filter_type:
                     # guess archive name by cwd
-                    import os
                     cwd = os.getcwd()
                     cwd = os.path.abspath(cwd)  # is this necessary?
                     archive = cwd.split(os.sep)[-1]
