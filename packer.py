@@ -114,8 +114,11 @@ def pack_filter(args):
         opt.append('-v')
     if args.extra_opt is not None:
         opt += shlex.split(args.extra_opt)
-        
-    compressor = local[suf2filter[args.format]]
+    
+    if args.packer is None:
+        compressor = local[suf2filter[args.format]]
+    else:
+        compressor = local[args.packer]
     
     retcode_final = 0
     for x in args.inputs:
@@ -467,7 +470,9 @@ def main():
                             help="increase output verbosity")
         parser.add_argument('--password', '--passwd', '-p', help='specify password for archive')
         parser.add_argument('--extra-opt', help='extra options passed to the packer')
-        parser.add_argument('--packer', choices={'rar', 'winrar', '7z', 'zip', 'tar', 'gzip', 'bzip2', 'xz'},
+        parser.add_argument('--packer',
+                            choices={'rar', 'winrar', 'unrar', '7z', '7zr', 'zip', 'unzip', 'tar',
+                                     'gzip', 'bzip2', 'xz', 'lzma', 'lzip', 'lzop'},
                             help='specify packer')
         parser.add_argument('--format', '-f', help='specify archive format')
     
