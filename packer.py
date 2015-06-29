@@ -6,6 +6,8 @@
 
 # TODO: --best option
 # TODO: unpacker.py
+# TODO: --test
+# TODO: add usage and help
 
 from __future__ import print_function, unicode_literals
 
@@ -232,6 +234,7 @@ def pack(args):
 
 def identify(filename):
     # BUG: tar.lzo, tar.lzma
+    # TODO: stdin?
     file_cmd = local['file']
     opt = ['-zb', '--', filename]
     cmd = file_cmd[opt]
@@ -377,9 +380,9 @@ def unpack_unzip(args):
     return run_cmd(cmd, args.verbosity)
 
 format2unpacker = {
-    '7z' : (unpack_7z, unpack_7zr, unpack_rar, unpack_winrar),
+    '7z' : (unpack_7z, unpack_7zr, unpack_winrar),
     'rar': (unpack_unrar, unpack_rar, unpack_winrar, unpack_7z),
-    'zip': (unpack_unzip, unpack_7z, unpack_rar),
+    'zip': (unpack_unzip, unpack_7z, unpack_winrar),
 }
 
 def unpack(args):
@@ -390,19 +393,19 @@ def unpack(args):
             args.format = fmt
 
     fmt = format_normalize(fmt)
-    # tar, tar.*
-    if fmt in {'tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'tar.lzma', 'tar.Z', 'tar.lz', 'tar.lzo'}:
-        return unpack_tar(args)
-    # filter_type = {'gz', 'bz2', 'xz', 'lzma', 'Z', 'lz', 'lzo'}
-    elif fmt in filter_type:
-        if args.output is None:
-            if args.archive.endswith('.'+fmt):
-                args.output = args.archive[:-len('.'+fmt)]
-            else:
-                raise Exception('you must specify --to option')
-        return unpack_filter(args)
-    elif fmt in {'7z', 'rar', 'zip'}:
-        if args.packer is None:
+    if args.packer is None:
+        # tar, tar.*
+        if fmt in {'tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'tar.lzma', 'tar.Z', 'tar.lz', 'tar.lzo'}:
+            return unpack_tar(args)
+        # filter_type = {'gz', 'bz2', 'xz', 'lzma', 'Z', 'lz', 'lzo'}
+        elif fmt in filter_type:
+            if args.output is None:
+                if args.archive.endswith('.'+fmt):
+                    args.output = args.archive[:-len('.'+fmt)]
+                else:
+                    raise Exception('you must specify --to option')
+            return unpack_filter(args)
+        elif fmt in {'7z', 'rar', 'zip'}:
             for unpacker in format2unpacker[fmt]:
                 try:
                     return unpacker(args)
@@ -410,13 +413,7 @@ def unpack(args):
                     continue
             else:
                 raise Exception(str(format2unpacker[fmt])+' not found')
-        else:
-            if args.packer == 'zip':
-                args.packer = 'unzip'
-            unpacker = getattr(sys.modules[__name__], 'unpack_'+args.packer)
-            return unpacker(args)
-    elif fmt == 'unknown':
-        if args.packer is None:
+        elif fmt == 'unknown':
             for unpacker in (unpack_7z, unpack_rar, unpack_winrar):
                 try:
                     return unpacker(args)
@@ -425,26 +422,185 @@ def unpack(args):
             else:
                 raise Exception('unknown format, 7z or rar or winrar not found')
         else:
-            unpacker = getattr(sys.modules[__name__], 'unpack_'+args.packer)
-            return unpacker(args)
+            raise Exception('unhandled format '+str(args.format))
     else:
-        raise Exception('unhandled format '+str(args.format))
+        if args.packer == 'zip':
+            args.packer = 'unzip'
+        unpacker = getattr(sys.modules[__name__], 'unpack_'+args.packer)
+        return unpacker(args)
 ## end unpack*
 
+## begin view*
+def view_tar(args):
+    tar = local['tar']
+    tar_opt = ['tf', args.archive]
+    # tar bug
+    if args.format == 'tar.lzma':
+        tar_opt.append('--lzma')
+    if args.extra_opt is not None:
+        tar_opt += shlex.split(args.extra_opt)
+    if args.verbosity:
+        tar_opt.append('-v')
+        
+    cmd = tar[tar_opt]
+    return run_cmd(cmd, args.verbosity)
+
+def view_gz(args):
+    gz_cmd = local['gzip']
+    opt = ['--list']
+    if args.verbosity:
+        opt.append('-v')
+    if args.extra_opt is not None:
+        opt += shlex.split(args.extra_opt)
+
+    cmd = gz_cmd[opt]
+    if args.archive != '-':
+        cmd = cmd < args.archive
+    ret =  run_cmd(cmd, args.verbosity)
+    if args.test:
+        opt.remove('--list')
+        opt.append('--test')
+        cmd = gz_cmd[opt]
+        if args.archive != '-':
+            cmd = cmd < args.archive
+        ret2 = run_cmd(cmd, args.verbosity)
+        ret = ret or ret2
+    
+    return ret
+
+def view_7z_common(args, cmd_bin):
+    sevenz = local[cmd_bin]
+    if args.test:
+        opt = ['t', args.archive]
+    else:
+        opt = ['l', args.archive]
+        if args.verbosity > 1:
+            opt.append('-slt')
+    
+    if args.format is not None:
+        opt.append('-t'+format_normalize(args.format))
+    if args.password is not None:
+        opt.append('-p'+args.password)
+    if args.extra_opt is not None:
+        opt += shlex.split(args.extra_opt)
+    
+    cmd = sevenz[opt]
+    return run_cmd(cmd, args.verbosity)
+
+def view_7z(args):
+    return view_7z_common(args, '7z')
+
+def view_7zr(args):
+    return view_7z_common(args, '7zr')
+
+def view_rar_common(args, cmd_bin):
+    rar = local[cmd_bin]
+    if args.test:
+        opt = ['t', args.archive]
+    else:
+        if args.verbosity > 2:
+            opt = ['vta', args.archive]
+        elif args.verbosity > 1:
+            opt = ['vt', args.archive]
+        elif args.verbosity > 0:
+            opt = ['v', args.archive]
+        else:
+            opt = ['lb', args.archive]
+
+    if args.password is not None:
+        opt.append('-p'+args.password)
+    if args.extra_opt is not None:
+        opt += shlex.split(args.extra_opt)
+    
+    cmd = rar[opt]
+    return run_cmd(cmd, args.verbosity)
+
+# winrar do not support listing
+
+def view_rar(args):
+    return view_rar_common(args, 'rar')
+
+def view_unrar(args):
+    return view_rar_common(args, 'unrar')
+
+def view_unzip(args):
+    unzip = local['unzip']
+    if args.test:
+        opt = ['-t']
+    else:
+        opt = ['-Z']
+        if args.verbosity > 1:
+            opt.append('-v')
+        elif args.verbosity > 0:
+            opt.append('-s')
+        else:
+            opt.append('-1')
+    opt.append('--')
+    opt.append(args.archive)
+    
+    cmd = unzip[opt]
+    return run_cmd(cmd, args.verbosity)
+
+format2viewer = {
+    '7z' : (view_7z, view_7zr),
+    'rar': (view_unrar, view_rar, view_7z),
+    'zip': (view_unzip, view_7z),
+}
+
 def view(args):
-    pass
+    fmt = args.format
+    if fmt is None:
+        fmt = identify(args.archive)
+        if fmt != 'unknown':
+            args.format = fmt
+
+    fmt = format_normalize(fmt)
+    if args.packer is None:
+        # tar, tar.*
+        if fmt in {'tar', 'tar.gz', 'tar.bz2', 'tar.xz', 'tar.lzma', 'tar.Z', 'tar.lz', 'tar.lzo'}:
+            return view_tar(args)
+        elif fmt == 'gz':
+            return view_gz(args)
+        # filter_type = {'gz', 'bz2', 'xz', 'lzma', 'Z', 'lz', 'lzo'}
+        elif fmt in filter_type:
+            raise Exception("'%s' do not support listing" % fmt)
+        elif fmt in {'7z', 'rar', 'zip'}:
+            for viewer in format2viewer[fmt]:
+                try:
+                    return viewer(args)
+                except CommandNotFound:
+                    continue
+            else:
+                raise Exception(str(format2viewer[fmt])+' not found')
+        elif fmt == 'unknown':
+            for viewer in (view_7z,):
+                try:
+                    return viewer(args)
+                except CommandNotFound:
+                    continue
+            else:
+                raise Exception('unknown format, 7z or rar or winrar not found')
+        else:
+            raise Exception('unhandled format '+str(args.format))
+    else:
+        if args.packer == 'zip':
+            args.packer = 'unzip'
+        viewer = getattr(sys.modules[__name__], 'view_'+args.packer)
+        return viewer(args)
+# end view*
+
 
 def main():
     # packer file1 [file2]... [--to output] [--format tgz]
-    ps1 = SilentArgumentParser(description='compress files.\n'
+    parser1 = SilentArgumentParser(description='compress files.\n'
                                'examples:\n'
                                '    packer 1.txt 2.txt --to archive.7z\n'
                                '    packer 1.txt 2.txt --to archive.tar.gz --format=tar.gz\n'
                                '    packer 1.txt 2.txt --format gz                # got 1.txt.gz, 2.txt.gz\n'
                                '    cat file | packer - --format xz > file.xz     # read from stdin\n'
                                '\n')
-    ps1.add_argument('inputs', nargs='+')
-    ps1.add_argument('--to', metavar='ARCHIVE', dest='archive')
+    parser1.add_argument('inputs', nargs='+')
+    parser1.add_argument('--to', metavar='ARCHIVE', dest='archive')
 
 #     # packer --add|-a archive [--format tgz] --with files...
 #     ps2 = SilentArgumentParser()
@@ -452,22 +608,23 @@ def main():
 #     ps2.add_argument('--with', nargs='+', metavar='INPUT', required=True, dest='inputs')
     
     # packer -x archive --to dir/
-    ps3 = SilentArgumentParser(description='decompress archive.\n'
+    parser2 = SilentArgumentParser(description='decompress archive.\n'
                                'examples:\n'
                                '    packer -x archive.tgz\n'
                                '    packer -x archive.7z --to directory/\n'
                                '    packer -x archive.gz --to -    # write contents of archive.gz to stdout\n'
                                '\n')
-    ps3.add_argument('-x', '--extract', metavar='ARCHIVE', required=True, dest='archive')
-    ps3.add_argument('--to', metavar='OUTPUT', required=False, dest='output')
+    parser2.add_argument('-x', '--extract', metavar='ARCHIVE', required=True, dest='archive')
+    parser2.add_argument('--to', metavar='OUTPUT', required=False, dest='output')
     
-    # packer [--test] archive
-    ps4 = SilentArgumentParser(description='list archive contents, test archive.')
-    ps4.add_argument('--test', '-t', action='store_true')
-    ps4.add_argument('archive')
+    # packer [--test] --list archive
+    parser3 = SilentArgumentParser(description='list archive contents, test archive.')
+    parser3.add_argument('--test', '-t', action='store_true')
+    parser3.add_argument('--list', '-l', metavar='ARCHIVE', required=True, dest='archive')
+#     parser3.add_argument('archive')
     
     # add common options
-    for parser in (ps1, ps3, ps4):
+    for parser in (parser1, parser2, parser3):
         parser.add_argument("-v", "--verbosity", action="count", default=0,
                             help="increase output verbosity")
         parser.add_argument('--password', '--passwd', '-p', help='specify password for archive')
@@ -483,7 +640,7 @@ def main():
     help_tester.add_argument('-h', '--help', help='show all help', dest='help', action='store_true')
     args, unknown = help_tester.parse_known_args()
     if args.help:
-        for parser in (ps1, ps3, ps4):
+        for parser in (parser1, parser2, parser3):
             parser.print_help()
             print()
             print()
@@ -491,7 +648,7 @@ def main():
     
     # packer file1 [file2]... [--to output] [--format tgz]
     try:
-        args = ps1.parse_args()
+        args = parser1.parse_args()
     except ParseError:
         # try next parser
         pass
@@ -499,21 +656,21 @@ def main():
         # run
         # do furer check on options
         if args.format is None and args.archive is None:
-            ps1.user_error('you must specify --to or --format')
+            parser1.user_error('you must specify --to or --format')
             return 1
         
         if args.format is None:
             # guess format by archive name
             args.format = get_format_by_filename(args.archive)
             if args.format is None:
-                ps1.user_error('could not determine archive type, '
+                parser1.user_error('could not determine archive type, '
                                'add --format option or use proper extension in --to')
                 return 1
         else:
             if args.format in filter_type:
                 if args.archive is not None:
                     if len(args.inputs) > 1:
-                        ps1.user_error('too many INPUTS')
+                        parser1.user_error('too many INPUTS')
         
         if args.archive is None:
             if len(args.inputs) == 1:
@@ -530,7 +687,7 @@ def main():
                     archive = cwd.split(os.sep)[-1]
                     if archive == '':
                         # we are at root directory
-                        ps1.user_error('could not determine archive name, you must specify --to')
+                        parser1.user_error('could not determine archive name, you must specify --to')
                         return 1
                     archive += '.'+args.format
                     args.archive = archive
@@ -540,7 +697,7 @@ def main():
     
     # packer -x archive --to dir/
     try:
-        args = ps3.parse_args()
+        args = parser2.parse_args()
     except ParseError:
         # try next parser
         pass
@@ -548,11 +705,16 @@ def main():
         # run
         return unpack(args)
     
-    # packer [--test] archive
-    # todo:
+    # packer [--test] --list archive
+    try:
+        args = parser3.parse_args()
+    except ParseError:
+        pass
+    else:
+        return view(args)
     
     # all parsers fail to parse, print usage and exit
-    for parser in (ps1, ps3, ps4):
+    for parser in (parser1, parser2, parser3):
         parser.print_usage()
     return 1
     
