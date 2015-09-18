@@ -6,8 +6,7 @@
 
 # TODO: --best option
 # TODO: unpacker.py
-# TODO: --test
-# TODO: add usage and help
+# TODO: cpio
 
 from __future__ import print_function, unicode_literals
 
@@ -19,7 +18,7 @@ class ParseError(Exception):
 
 class SilentArgumentParser(argparse.ArgumentParser):
     def __init__(self, *args, **kwds):
-        super().__init__(formatter_class=argparse.RawDescriptionHelpFormatter, *args, **kwds)
+        super(SilentArgumentParser, self).__init__(formatter_class=argparse.RawDescriptionHelpFormatter, *args, **kwds)
     def error(self, message):
         raise ParseError('not match')
     def user_error(self, msg):
@@ -591,11 +590,58 @@ def view(args):
 
 
 def main():
+    def print_usage():
+        app = sys.argv[0].split(os.path.sep)[-1]
+        print("""usage:
+    compress files
+    --------------
+    {app} 1.txt 2.txt --to archive.7z
+    {app} dir/ --format=tar.gz                  # got dir.tar.gz
+    {app} 1.txt 2.txt --format gz               # got 1.txt.gz, 2.txt.gz
+    cat file | {app} - --format xz > file.xz    # read from stdin
+    
+    extract
+    -------
+    {app} -x archive.tgz                        # extract to current dir
+    {app} -x archive.7z --to directory/         # extract to directory/
+    {app} -x archive.gz --to -     # write contents of archive.gz to stdout
+    
+    view
+    ----
+    {app} --list archive.rar                    # list archive.rar
+    {app} --test --list archive.rar             # test archive.rar
+    """.format(app=app), file=sys.stderr)
+    
+    def print_help():
+        print_usage()
+        print("""options:
+  -h, --help
+                        show this help message and exit
+  -v, --verbosity
+                        increase output verbosity
+  -x ARCHIVE, --extract ARCHIVE
+                        extract ARCHIVE
+  --to OUTPUT
+                        output to OUTPUT (file or dir)
+  --list ARCHIVE, -l ARCHIVE
+                        list files in ARCHIVE
+  --test, -t
+                        test ARCHIVE, must be used with --list
+  --password PASSWORD, --passwd PASSWORD, -p PASSWORD
+                        specify password for archive
+  --extra-opt EXTRA_OPT
+                        extra options passed to the packer
+  --packer {lzma,bzip2,unzip,zip,tar,lzop,7zr,lzip,xz,unrar,rar,gzip,winrar,7z}
+                        specify packer
+  --format FORMAT, -f FORMAT
+                        specify archive format
+    """, file=sys.stderr)
+    
     # packer file1 [file2]... [--to output] [--format tgz]
     parser1 = SilentArgumentParser(description='compress files.\n'
                                'examples:\n'
                                '    packer 1.txt 2.txt --to archive.7z\n'
-                               '    packer 1.txt 2.txt --to archive.tar.gz --format=tar.gz\n'
+                               '    packer dir/ --format=tar.gz                   # got dir.tar.gz\n'
                                '    packer 1.txt 2.txt --format gz                # got 1.txt.gz, 2.txt.gz\n'
                                '    cat file | packer - --format xz > file.xz     # read from stdin\n'
                                '\n')
@@ -621,7 +667,6 @@ def main():
     parser3 = SilentArgumentParser(description='list archive contents, test archive.')
     parser3.add_argument('--test', '-t', action='store_true')
     parser3.add_argument('--list', '-l', metavar='ARCHIVE', required=True, dest='archive')
-#     parser3.add_argument('archive')
     
     # add common options
     for parser in (parser1, parser2, parser3):
@@ -640,10 +685,11 @@ def main():
     help_tester.add_argument('-h', '--help', help='show all help', dest='help', action='store_true')
     args, unknown = help_tester.parse_known_args()
     if args.help:
-        for parser in (parser1, parser2, parser3):
-            parser.print_help()
-            print()
-            print()
+#         for parser in (parser1, parser2, parser3):
+#             parser.print_help()
+#             print()
+#             print()
+        print_help()
         return 0
     
     # packer file1 [file2]... [--to output] [--format tgz]
@@ -714,8 +760,9 @@ def main():
         return view(args)
     
     # all parsers fail to parse, print usage and exit
-    for parser in (parser1, parser2, parser3):
-        parser.print_usage()
+#     for parser in (parser1, parser2, parser3):
+#         parser.print_usage()
+    print_usage()
     return 1
     
 
