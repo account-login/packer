@@ -84,7 +84,7 @@ def run_cmd(cmd, verbose=False):
         return e.retcode
 
 def run_cmd_dry(cmd, verbose=False):
-    print(str(cmd), file=sys.stderr)
+    print(str(cmd))
     return 0
 
 
@@ -628,7 +628,7 @@ def main():
             s = 'usage:' + s_extract
         else:
             s = 'usage:' + s_compress + s_extract + s_view
-        print(s.format(app=app), file=sys.stderr)
+        print(s.format(app=app))
     
     
     def print_help(app):
@@ -656,7 +656,7 @@ def main():
                         specify archive format
   --dry-run, --simulate
                         do not run the command
-    """, file=sys.stderr)
+    """)
     
     
     argv = sys.argv.copy()
