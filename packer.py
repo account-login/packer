@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# HOW TO INSTALL?
 # apt-get install p7zip-full rar zip unzip tar gzip bzip2 xz-utils lzma lzip lzop
-# alias unpacker='packer -x'
+# make install    # or make link
 
 # TODO: --best option
-# TODO: unpacker.py
-# TODO: cpio
+# TODO: cpio, dar, ar, arj, ace, arc, rpm, deb, cab, rzip, lrzip, alzip, lha
+# TODO: atool
 
 from __future__ import print_function, unicode_literals
 
@@ -81,6 +82,10 @@ def run_cmd(cmd, verbose=False):
         return 0
     except ProcessExecutionError as e:
         return e.retcode
+
+def run_cmd_dry(cmd, verbose=False):
+    print(str(cmd), file=sys.stderr)
+    return 0
 
 
 ## begin pack*
@@ -299,6 +304,9 @@ def ensure_output_dir(directory):
         directory = '.'
     os.makedirs(directory, exist_ok=True)
     return directory
+
+def ensure_output_dir_dry(dir):
+    return dir
     
 def unpack_tar(args):
     args.output = ensure_output_dir(args.output)
@@ -327,7 +335,6 @@ def unpack_filter(args):
     if args.archive != '-':
         cmd = cmd < args.archive
     if args.output != '-':
-        ensure_output_dir(os.path.dirname(args.output))
         cmd = cmd > args.output
     return run_cmd(cmd, args.verbosity)
 
@@ -588,32 +595,44 @@ def view(args):
         return viewer(args)
 # end view*
 
+def dry_run_patch():
+    global run_cmd, ensure_output_dir
+    run_cmd = run_cmd_dry
+    ensure_output_dir = ensure_output_dir_dry
+
 
 def main():
-    def print_usage():
-        app = sys.argv[0].split(os.path.sep)[-1]
-        print("""usage:
+    def print_usage(app):
+        s_compress = """
     compress files
     --------------
     {app} 1.txt 2.txt --to archive.7z
     {app} dir/ --format=tar.gz                  # got dir.tar.gz
     {app} 1.txt 2.txt --format gz               # got 1.txt.gz, 2.txt.gz
     cat file | {app} - --format xz > file.xz    # read from stdin
-    
+    """
+        s_extract = """
     extract
     -------
     {app} -x archive.tgz                        # extract to current dir
     {app} -x archive.7z --to directory/         # extract to directory/
     {app} -x archive.gz --to -     # write contents of archive.gz to stdout
-    
+    """
+        s_view = """
     view
     ----
     {app} --list archive.rar                    # list archive.rar
     {app} --test --list archive.rar             # test archive.rar
-    """.format(app=app), file=sys.stderr)
+    """
+        if app.lower().startswith('unpack'):
+            s = 'usage:' + s_extract
+        else:
+            s = 'usage:' + s_compress + s_extract + s_view
+        print(s.format(app=app), file=sys.stderr)
     
-    def print_help():
-        print_usage()
+    
+    def print_help(app):
+        print_usage(app)
         print("""options:
   -h, --help
                         show this help message and exit
@@ -635,10 +654,20 @@ def main():
                         specify packer
   --format FORMAT, -f FORMAT
                         specify archive format
+  --dry-run, --simulate
+                        do not run the command
     """, file=sys.stderr)
     
+    
+    argv = sys.argv.copy()
+    app = argv[0].rsplit(os.path.sep, maxsplit=1)[-1]
+    # unpacker ... is equivalent to packer -x ...
+    if app.lower().startswith('unpack'):
+        argv.insert(1, '-x')
+    
+    
     # packer file1 [file2]... [--to output] [--format tgz]
-    parser1 = SilentArgumentParser(description='compress files.\n'
+    parser1 = SilentArgumentParser(prog=app, description='compress files.\n'
                                'examples:\n'
                                '    packer 1.txt 2.txt --to archive.7z\n'
                                '    packer dir/ --format=tar.gz                   # got dir.tar.gz\n'
@@ -654,7 +683,7 @@ def main():
 #     ps2.add_argument('--with', nargs='+', metavar='INPUT', required=True, dest='inputs')
     
     # packer -x archive --to dir/
-    parser2 = SilentArgumentParser(description='decompress archive.\n'
+    parser2 = SilentArgumentParser(prog=app, description='decompress archive.\n'
                                'examples:\n'
                                '    packer -x archive.tgz\n'
                                '    packer -x archive.7z --to directory/\n'
@@ -664,7 +693,7 @@ def main():
     parser2.add_argument('--to', metavar='OUTPUT', required=False, dest='output')
     
     # packer [--test] --list archive
-    parser3 = SilentArgumentParser(description='list archive contents, test archive.')
+    parser3 = SilentArgumentParser(prog=app, description='list archive contents, test archive')
     parser3.add_argument('--test', '-t', action='store_true')
     parser3.add_argument('--list', '-l', metavar='ARCHIVE', required=True, dest='archive')
     
@@ -679,22 +708,24 @@ def main():
                                      'gzip', 'bzip2', 'xz', 'lzma', 'lzip', 'lzop'},
                             help='specify packer')
         parser.add_argument('--format', '-f', help='specify archive format')
+        parser.add_argument('--dry-run', '--simulate', help='do not run the command', dest='dry_run',
+                            action='store_true')
     
     # print help and exit if -h in options
     help_tester = SilentArgumentParser(add_help=False)
     help_tester.add_argument('-h', '--help', help='show all help', dest='help', action='store_true')
-    args, unknown = help_tester.parse_known_args()
+    help_tester.add_argument('--dry-run', '--simulate', help='do not run the command', dest='dry_run',
+                             action='store_true')
+    args, unknown = help_tester.parse_known_args(argv[1:])
     if args.help:
-#         for parser in (parser1, parser2, parser3):
-#             parser.print_help()
-#             print()
-#             print()
-        print_help()
+        print_help(app)
         return 0
+    if args.dry_run:
+        dry_run_patch()
     
     # packer file1 [file2]... [--to output] [--format tgz]
     try:
-        args = parser1.parse_args()
+        args = parser1.parse_args(argv[1:])
     except ParseError:
         # try next parser
         pass
@@ -743,7 +774,7 @@ def main():
     
     # packer -x archive --to dir/
     try:
-        args = parser2.parse_args()
+        args = parser2.parse_args(argv[1:])
     except ParseError:
         # try next parser
         pass
@@ -753,18 +784,15 @@ def main():
     
     # packer [--test] --list archive
     try:
-        args = parser3.parse_args()
+        args = parser3.parse_args(argv[:1])
     except ParseError:
         pass
     else:
         return view(args)
     
     # all parsers fail to parse, print usage and exit
-#     for parser in (parser1, parser2, parser3):
-#         parser.print_usage()
-    print_usage()
+    print_usage(app)
     return 1
-    
 
 if __name__ == '__main__':
     sys.exit(main())
