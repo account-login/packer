@@ -6,6 +6,7 @@
 # make install    # or make link
 
 # TODO: --best option
+# TODO: --override option
 # TODO: cpio, dar, ar, arj, ace, arc, rpm, deb, cab, rzip, lrzip, alzip, lha
 # TODO: atool
 
@@ -166,6 +167,7 @@ def pack_7zr(args):
 def pack_rar(args):
     rar = local['rar']
     opt = ['a', args.archive]
+    opt.append('-r')    # rar is not recursive by default
     if args.password is not None:
         opt.append('-p'+args.password)
     if args.extra_opt is not None:
@@ -179,6 +181,7 @@ def pack_rar(args):
 def pack_winrar(args):
     rar = local['winrar']
     opt = ['a', args.archive, '-af'+args.format]
+    opt.append('-r')    # rar is not recursive by default
     if args.password is not None:
         opt.append('-p'+args.password)
     if args.extra_opt is not None:
