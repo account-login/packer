@@ -312,8 +312,8 @@ def ensure_output_dir(directory):
     os.makedirs(directory, exist_ok=True)
     return directory
 
-def ensure_output_dir_dry(dir):
-    return dir
+def ensure_output_dir_dry(directory):
+    return directory
     
 def unpack_tar(args):
     args.output = ensure_output_dir(args.output)
@@ -756,6 +756,7 @@ def main():
                 if args.archive is not None:
                     if len(args.inputs) > 1:
                         parser1.user_error('too many INPUTS')
+                        return 1
         
         if args.archive is None:
             if len(args.inputs) == 1:
