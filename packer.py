@@ -3,6 +3,7 @@
 
 # HOW TO INSTALL?
 # apt-get install p7zip-full rar zip unzip tar gzip bzip2 xz-utils lzma lzip lzop
+# pip install plumbum
 # make install    # or make link
 
 # TODO: --best option
@@ -19,6 +20,9 @@ class ParseError(Exception):
     pass
 
 class SilentArgumentParser(argparse.ArgumentParser):
+    '''
+    Parser that do not exit on parsing failure.
+    '''
     def __init__(self, *args, **kwds):
         super(SilentArgumentParser, self).__init__(formatter_class=argparse.RawDescriptionHelpFormatter, *args, **kwds)
     def error(self, message):
@@ -667,6 +671,7 @@ def main():
     # unpacker ... is equivalent to packer -x ...
     if app.lower().startswith('unpack'):
         argv.insert(1, '-x')
+    argv_body = argv[1:]
     
     
     # packer file1 [file2]... [--to output] [--format tgz]
@@ -719,7 +724,7 @@ def main():
     help_tester.add_argument('-h', '--help', help='show all help', dest='help', action='store_true')
     help_tester.add_argument('--dry-run', '--simulate', help='do not run the command', dest='dry_run',
                              action='store_true')
-    args, unknown = help_tester.parse_known_args(argv[1:])
+    args, unknown = help_tester.parse_known_args(argv_body)
     if args.help:
         print_help(app)
         return 0
@@ -728,7 +733,7 @@ def main():
     
     # packer file1 [file2]... [--to output] [--format tgz]
     try:
-        args = parser1.parse_args(argv[1:])
+        args = parser1.parse_args(argv_body)
     except ParseError:
         # try next parser
         pass
@@ -777,7 +782,7 @@ def main():
     
     # packer -x archive --to dir/
     try:
-        args = parser2.parse_args(argv[1:])
+        args = parser2.parse_args(argv_body)
     except ParseError:
         # try next parser
         pass
@@ -787,7 +792,7 @@ def main():
     
     # packer [--test] --list archive
     try:
-        args = parser3.parse_args(argv[:1])
+        args = parser3.parse_args(argv_body)
     except ParseError:
         pass
     else:
