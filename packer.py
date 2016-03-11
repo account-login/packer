@@ -1,27 +1,139 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# HOW TO INSTALL?
-# apt-get install p7zip-full rar zip unzip tar gzip bzip2 xz-utils lzma lzip lzop
-# pip install plumbum
-# make install    # or make link
+'''
+Introduction
+============
+
+`packer.py` is a wrapper around popular file archiving/compressing tools (tar, zip, rar, gzip, ...).
+The purpose of this script is to provide unified command-line interface to existing tools,
+so you don't need to read boring manpages when you forget the command-line option of tar, 7z, zip, ... 
+There is a similar project `atool` that achieves the same purpose.
+
+`packer.py` currently supports 7z, rar, zip, tar, tar.*, gzip, bzip2, xz, lzma, lzip, lzop formats.
+`packer.py` uses `file` command to identify archive, then the appropriate tool was used to handle
+ that archive.
+If the type of a archive can't be identified, 7z was used to handle that archive.
+
+packer.py requires python3.4+, plumbum
+
+Usage
+=====
+```
+{usage}
+```
+
+Installation
+============
+
+Get some command-line tools that packer.py can work with.
+
+`apt-get install p7zip-full rar zip unzip tar gzip bzip2 xz-utils lzma lzip lzop`
+
+Install dependency
+
+`pip install plumbum`
+
+Copy packer.py to /usr/local/bin and create `upacker`, `packer` symlinks 
+
+`make install`
+
+Options
+=======
+```
+{options}
+```
+'''
 
 # TODO: --best option
 # TODO: --override option
 # TODO: cpio, dar, ar, arj, ace, arc, rpm, deb, cab, rzip, lrzip, alzip, lha
 # TODO: atool
 
-from __future__ import print_function, unicode_literals
-
 import sys, os, argparse, shlex
+from io import StringIO
 from plumbum import local, CommandNotFound
+
+
+def print_usage(app, file=sys.stdout):
+    s_compress = """
+    compress files
+    --------------
+    {app} 1.txt 2.txt --to archive.7z
+    {app} dir/ --format=tar.gz                  # got dir.tar.gz
+    {app} 1.txt 2.txt --format gz               # got 1.txt.gz, 2.txt.gz
+    cat file | {app} - --format xz > file.xz    # read from stdin
+    """
+    s_extract = """
+    extract
+    -------
+    {app} -x archive.tgz                        # extract to current dir
+    {app} -x archive.7z --to directory/         # extract to directory/
+    {app} -x archive.gz --to -     # write contents of archive.gz to stdout
+    """
+    s_view = """
+    view
+    ----
+    {app} --list archive.rar                    # list archive.rar
+    {app} --test --list archive.rar             # test archive.rar
+"""
+    if app.lower().startswith('unpack'):
+        s = 'usage:' + s_extract
+    else:
+        s = 'usage:' + s_compress + s_extract + s_view
+    print(s.format(app=app), file=file)
+
+def print_options_help(app, file=sys.stdout):
+    print("""options:
+  -h, --help
+                        show this help message and exit
+  -v, --verbosity
+                        increase output verbosity
+  -x ARCHIVE, --extract ARCHIVE
+                        extract ARCHIVE
+  --to OUTPUT
+                        output to OUTPUT (file or dir)
+  --list ARCHIVE, -l ARCHIVE
+                        list files in ARCHIVE
+  --test, -t
+                        test ARCHIVE, must be used with --list
+  --password PASSWORD, --passwd PASSWORD, -p PASSWORD
+                        specify password for archive
+  --extra-opt EXTRA_OPT
+                        extra options passed to the packer
+  --packer {lzma,bzip2,unzip,zip,tar,lzop,7zr,lzip,xz,unrar,rar,gzip,winrar,7z}
+                        specify packer
+  --format FORMAT, -f FORMAT
+                        specify archive format
+  --dry-run, --simulate
+                        do not run the command
+""", file=file)
+
+def print_help(app, file=sys.stdout):
+    print_usage(app, file=file)
+    print_options_help(app, file=file)
+
+def fill_doc_string():
+    # complete __doc__ string
+    usage = StringIO()
+    print_usage(app='packer.py', file=usage)
+    usage = usage.getvalue()
+    
+    options = StringIO()
+    print_options_help(app='packer.py', file=options)
+    options = options.getvalue()
+    
+    global __doc__ # @ReservedAssignment
+    __doc__ = __doc__.format(usage=usage, options=options) # @ReservedAssignment
+
+fill_doc_string()
 
 class ParseError(Exception):
     pass
 
 class SilentArgumentParser(argparse.ArgumentParser):
     '''
-    Parser that do not exit on parsing failure.
+    ArgumentParser that do not exit on parsing failure.
     '''
     def __init__(self, *args, **kwds):
         super(SilentArgumentParser, self).__init__(formatter_class=argparse.RawDescriptionHelpFormatter, *args, **kwds)
@@ -609,73 +721,16 @@ def dry_run_patch():
 
 
 def main():
-    def print_usage(app):
-        s_compress = """
-    compress files
-    --------------
-    {app} 1.txt 2.txt --to archive.7z
-    {app} dir/ --format=tar.gz                  # got dir.tar.gz
-    {app} 1.txt 2.txt --format gz               # got 1.txt.gz, 2.txt.gz
-    cat file | {app} - --format xz > file.xz    # read from stdin
-    """
-        s_extract = """
-    extract
-    -------
-    {app} -x archive.tgz                        # extract to current dir
-    {app} -x archive.7z --to directory/         # extract to directory/
-    {app} -x archive.gz --to -     # write contents of archive.gz to stdout
-    """
-        s_view = """
-    view
-    ----
-    {app} --list archive.rar                    # list archive.rar
-    {app} --test --list archive.rar             # test archive.rar
-    """
-        if app.lower().startswith('unpack'):
-            s = 'usage:' + s_extract
-        else:
-            s = 'usage:' + s_compress + s_extract + s_view
-        print(s.format(app=app))
-    
-    
-    def print_help(app):
-        print_usage(app)
-        print("""options:
-  -h, --help
-                        show this help message and exit
-  -v, --verbosity
-                        increase output verbosity
-  -x ARCHIVE, --extract ARCHIVE
-                        extract ARCHIVE
-  --to OUTPUT
-                        output to OUTPUT (file or dir)
-  --list ARCHIVE, -l ARCHIVE
-                        list files in ARCHIVE
-  --test, -t
-                        test ARCHIVE, must be used with --list
-  --password PASSWORD, --passwd PASSWORD, -p PASSWORD
-                        specify password for archive
-  --extra-opt EXTRA_OPT
-                        extra options passed to the packer
-  --packer {lzma,bzip2,unzip,zip,tar,lzop,7zr,lzip,xz,unrar,rar,gzip,winrar,7z}
-                        specify packer
-  --format FORMAT, -f FORMAT
-                        specify archive format
-  --dry-run, --simulate
-                        do not run the command
-    """)
-    
-    
     argv = sys.argv.copy()
     app = argv[0].rsplit(os.path.sep, maxsplit=1)[-1]
     # unpacker ... is equivalent to packer -x ...
     if app.lower().startswith('unpack'):
         argv.insert(1, '-x')
     argv_body = argv[1:]
-    
+
     
     # packer file1 [file2]... [--to output] [--format tgz]
-    parser1 = SilentArgumentParser(prog=app, description='compress files.\n'
+    parser1 = SilentArgumentParser(prog=app, add_help=False, description='compress files.\n'
                                'examples:\n'
                                '    packer 1.txt 2.txt --to archive.7z\n'
                                '    packer dir/ --format=tar.gz                   # got dir.tar.gz\n'
@@ -684,14 +739,9 @@ def main():
                                '\n')
     parser1.add_argument('inputs', nargs='+')
     parser1.add_argument('--to', metavar='ARCHIVE', dest='archive')
-
-#     # packer --add|-a archive [--format tgz] --with files...
-#     ps2 = SilentArgumentParser()
-#     ps2.add_argument('--add', '-a', metavar='ARCHIVE', required=True, dest='archive')
-#     ps2.add_argument('--with', nargs='+', metavar='INPUT', required=True, dest='inputs')
     
     # packer -x archive --to dir/
-    parser2 = SilentArgumentParser(prog=app, description='decompress archive.\n'
+    parser2 = SilentArgumentParser(prog=app, add_help=False, description='decompress archive.\n'
                                'examples:\n'
                                '    packer -x archive.tgz\n'
                                '    packer -x archive.7z --to directory/\n'
@@ -701,7 +751,7 @@ def main():
     parser2.add_argument('--to', metavar='OUTPUT', required=False, dest='output')
     
     # packer [--test] --list archive
-    parser3 = SilentArgumentParser(prog=app, description='list archive contents, test archive')
+    parser3 = SilentArgumentParser(prog=app, add_help=False, description='list archive contents, test archive')
     parser3.add_argument('--test', '-t', action='store_true')
     parser3.add_argument('--list', '-l', metavar='ARCHIVE', required=True, dest='archive')
     
@@ -716,18 +766,24 @@ def main():
                                      'gzip', 'bzip2', 'xz', 'lzma', 'lzip', 'lzop'},
                             help='specify packer')
         parser.add_argument('--format', '-f', help='specify archive format')
+        # --dry-run option was not handled here, it is handled in help_tester below
         parser.add_argument('--dry-run', '--simulate', help='do not run the command', dest='dry_run',
                             action='store_true')
     
     # print help and exit if -h in options
     help_tester = SilentArgumentParser(add_help=False)
-    help_tester.add_argument('-h', '--help', help='show all help', dest='help', action='store_true')
+    help_tester.add_argument('-h', '--help', help='show all help', dest='help', nargs='?', const='cmd')
+    # --dry-run option was handled here
     help_tester.add_argument('--dry-run', '--simulate', help='do not run the command', dest='dry_run',
                              action='store_true')
-    args, unknown = help_tester.parse_known_args(argv_body)
-    if args.help:
+    args, unknown = help_tester.parse_known_args(argv_body) # @UnusedVariable
+    if args.help == 'cmd':
         print_help(app)
         return 0
+    elif args.help == 'markdown':
+        print(__doc__)
+        return 0
+    
     if args.dry_run:
         dry_run_patch()
     
@@ -801,6 +857,7 @@ def main():
     
     # all parsers fail to parse, print usage and exit
     print_usage(app)
+    print('Run `{} --help=markdown` to see full documentation.'.format(app))
     return 1
 
 if __name__ == '__main__':
