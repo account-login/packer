@@ -406,7 +406,9 @@ def identify(filename):
             
         sig = {
             'RAR archive data'    : 'rar',
+            'RAR self-extracting' : 'rar',
             'Zip archive data'    : 'zip',
+            'ZIP self-extracting' : 'zip',
             'tar archive'         : 'tar',
             '7-zip archive data'  : '7z',
         }
