@@ -7,7 +7,7 @@ Introduction
 
 `packer.py` is a wrapper around popular file archiving/compressing tools (tar, zip, rar, gzip, ...).
 The purpose of this script is to provide unified command-line interface to existing tools,
-so you don't need to read boring manpages when you forget the command-line option of tar, 7z, zip, ... 
+so you don't need to read boring manpages when you forget the command-line option of tar, 7z, zip, and etc.
 There is a similar project `atool` that achieves the same purpose.
 
 `packer.py` currently supports 7z, rar, zip, tar, tar.*, gzip, bzip2, xz, lzma, lzip, lzop formats.
@@ -34,7 +34,7 @@ Install dependency
 
 `pip install plumbum`
 
-Copy packer.py to /usr/local/bin and create `upacker`, `packer` symlinks 
+Copy packer.py to /usr/local/bin and create `upacker`, `packer` symlinks by executing
 
 `make install`
 
