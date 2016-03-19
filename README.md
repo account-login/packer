@@ -50,7 +50,7 @@ Install dependency
 
 `pip install plumbum`
 
-Copy packer.py to /usr/local/bin and create `upacker`, `packer` symlinks by executing
+Copy packer.py to /usr/local/bin and create `packer` symlinks by executing
 
 `make install`
 

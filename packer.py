@@ -34,7 +34,7 @@ Install dependency
 
 `pip install plumbum`
 
-Copy packer.py to /usr/local/bin and create `upacker`, `packer` symlinks by executing
+Copy packer.py to /usr/local/bin and create `packer` symlinks by executing
 
 `make install`
 
@@ -45,10 +45,12 @@ Options
 ```
 '''
 
+# TODO: add, convert
 # TODO: --best option
 # TODO: --override option
 # TODO: cpio, dar, ar, arj, ace, arc, rpm, deb, cab, rzip, lrzip, alzip, lha
 # TODO: atool
+# TODO: bash completion
 
 import sys, os, argparse, shlex
 from io import StringIO
@@ -77,10 +79,7 @@ def print_usage(app, file=sys.stdout):
     {app} --list archive.rar                    # list archive.rar
     {app} --test --list archive.rar             # test archive.rar
 """
-    if app.lower().startswith('unpack'):
-        s = 'usage:' + s_extract
-    else:
-        s = 'usage:' + s_compress + s_extract + s_view
+    s = 'usage:' + s_compress + s_extract + s_view
     print(s.format(app=app), file=file)
 
 def print_options_help(app, file=sys.stdout):
@@ -725,9 +724,6 @@ def dry_run_patch():
 def main():
     argv = sys.argv.copy()
     app = argv[0].rsplit(os.path.sep, maxsplit=1)[-1]
-    # unpacker ... is equivalent to packer -x ...
-    if app.lower().startswith('unpack'):
-        argv.insert(1, '-x')
     argv_body = argv[1:]
 
     
