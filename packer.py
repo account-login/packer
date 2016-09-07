@@ -48,6 +48,7 @@ Options
 # TODO: add, convert
 # TODO: --best option
 # TODO: --override option
+# TODO: --comment option
 # TODO: cpio, dar, ar, arj, ace, arc, rpm, deb, cab, rzip, lrzip, alzip, lha
 # TODO: atool
 # TODO: bash completion
@@ -117,11 +118,11 @@ def fill_doc_string():
     usage = StringIO()
     print_usage(app='packer.py', file=usage)
     usage = usage.getvalue()
-    
+
     options = StringIO()
     print_options_help(app='packer.py', file=options)
     options = options.getvalue()
-    
+
     global __doc__ # @ReservedAssignment
     __doc__ = __doc__.format(usage=usage, options=options) # @ReservedAssignment
 
@@ -170,7 +171,7 @@ def format_normalize(fmt):
         return 'tar.Z'
     if fmt.upper() == 'Z':
         return 'Z'
-    
+
     lfmt = fmt.lower()
     norm = {
         'tgz'  : 'tar.gz',
@@ -188,7 +189,7 @@ def format_normalize(fmt):
         return norm[lfmt]
     else:
         return lfmt
-    
+
 def run_cmd(cmd, verbose=False):
     if verbose:
         print('running: '+str(cmd), file=sys.stderr)
@@ -207,7 +208,7 @@ def run_cmd_dry(cmd, verbose=False):
 ## begin pack*
 def pack_tar(args):
     tar = local['tar']
-    
+
     tar_opt = ['cf', '-']
     if args.extra_opt is not None:
         tar_opt += shlex.split(args.extra_opt)
@@ -215,7 +216,7 @@ def pack_tar(args):
         tar_opt.append('-v')
     tar_opt.append('--')
     tar_opt += args.inputs
-    
+
     if args.format == 'tar':
         cmd = tar[tar_opt] > args.archive
     else:
@@ -234,12 +235,12 @@ def pack_filter(args):
         opt.append('-v')
     if args.extra_opt is not None:
         opt += shlex.split(args.extra_opt)
-    
+
     if args.packer is None:
         compressor = local[suf2filter[args.format]]
     else:
         compressor = local[args.packer]
-    
+
     retcode_final = 0
     for x in args.inputs:
         if len(args.inputs) == 1:
@@ -249,7 +250,7 @@ def pack_filter(args):
                 outfile = '-'
             else:
                 outfile = x+'.'+args.format
-                
+
         cmd = compressor[opt]
         if x != '-':
             cmd = cmd < x
@@ -259,7 +260,7 @@ def pack_filter(args):
         if retcode != 0:
             retcode_final = retcode
     return retcode_final
-        
+
 def pack_7z_common(args, cmd_bin):
     sevenz = local[cmd_bin]
     opt = ['a', args.archive, '-t'+format_normalize(args.format)]
@@ -269,7 +270,7 @@ def pack_7z_common(args, cmd_bin):
         opt += shlex.split(args.extra_opt)
     opt.append('--')
     opt += args.inputs
-    
+
     cmd = sevenz[opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -289,7 +290,7 @@ def pack_rar(args):
         opt += shlex.split(args.extra_opt)
     opt.append('--')
     opt += args.inputs
-    
+
     cmd = rar[opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -303,7 +304,7 @@ def pack_winrar(args):
         opt += shlex.split(args.extra_opt)
     opt.append('--')
     opt += args.inputs
-    
+
     cmd = rar[opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -318,7 +319,7 @@ def pack_zip(args):
         opt.append('-v')
     opt.append('--')
     opt += args.inputs
-    
+
     cmd = zip_cmd[opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -361,7 +362,7 @@ def identify(filename):
     opt = ['-zb', '--', filename]
     cmd = file_cmd[opt]
     result = cmd()
-    
+
     outer = {
         'gzip compressed data' : 'gz',
         'bzip2 compressed data': 'bz2',
@@ -402,7 +403,7 @@ def identify(filename):
                     return 'tar.lzo'
                 else:
                     return 'lzo'
-            
+
         sig = {
             'RAR archive data'    : 'rar',
             'RAR self-extracting' : 'rar',
@@ -427,7 +428,7 @@ def ensure_output_dir(directory):
 
 def ensure_output_dir_dry(directory):
     return directory
-    
+
 def unpack_tar(args):
     args.output = ensure_output_dir(args.output)
     tar = local['tar']
@@ -439,7 +440,7 @@ def unpack_tar(args):
         tar_opt += shlex.split(args.extra_opt)
     if args.verbosity:
         tar_opt.append('-v')
-        
+
     cmd = tar[tar_opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -473,7 +474,7 @@ def unpack_7z_rar_common(args, cmd_bin, rar):
             opt.append(args.output)
         else:
             opt.append('-o'+args.output)
-    
+
     cmd = sevenz[opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -501,7 +502,7 @@ def unpack_unzip(args):
     if args.password is not None:
         opt.append('-P'+args.password)
     opt += ['--', args.archive]
-    
+
     cmd = unzip_cmd[opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -567,7 +568,7 @@ def view_tar(args):
         tar_opt += shlex.split(args.extra_opt)
     if args.verbosity:
         tar_opt.append('-v')
-        
+
     cmd = tar[tar_opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -591,7 +592,7 @@ def view_gz(args):
             cmd = cmd < args.archive
         ret2 = run_cmd(cmd, args.verbosity)
         ret = ret or ret2
-    
+
     return ret
 
 def view_7z_common(args, cmd_bin):
@@ -602,14 +603,14 @@ def view_7z_common(args, cmd_bin):
         opt = ['l', args.archive]
         if args.verbosity > 1:
             opt.append('-slt')
-    
+
     if args.format is not None:
         opt.append('-t'+format_normalize(args.format))
     if args.password is not None:
         opt.append('-p'+args.password)
     if args.extra_opt is not None:
         opt += shlex.split(args.extra_opt)
-    
+
     cmd = sevenz[opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -637,7 +638,7 @@ def view_rar_common(args, cmd_bin):
         opt.append('-p'+args.password)
     if args.extra_opt is not None:
         opt += shlex.split(args.extra_opt)
-    
+
     cmd = rar[opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -663,7 +664,7 @@ def view_unzip(args):
             opt.append('-1')
     opt.append('--')
     opt.append(args.archive)
-    
+
     cmd = unzip[opt]
     return run_cmd(cmd, args.verbosity)
 
@@ -726,7 +727,7 @@ def main():
     app = argv[0].rsplit(os.path.sep, maxsplit=1)[-1]
     argv_body = argv[1:]
 
-    
+
     # packer file1 [file2]... [--to output] [--format tgz]
     parser1 = SilentArgumentParser(prog=app, add_help=False, description='compress files.\n'
                                'examples:\n'
@@ -737,7 +738,7 @@ def main():
                                '\n')
     parser1.add_argument('inputs', nargs='+')
     parser1.add_argument('--to', metavar='ARCHIVE', dest='archive')
-    
+
     # packer -x archive --to dir/
     parser2 = SilentArgumentParser(prog=app, add_help=False, description='decompress archive.\n'
                                'examples:\n'
@@ -747,12 +748,12 @@ def main():
                                '\n')
     parser2.add_argument('-x', '--extract', metavar='ARCHIVE', required=True, dest='archive')
     parser2.add_argument('--to', metavar='OUTPUT', required=False, dest='output')
-    
+
     # packer [--test] --list archive
     parser3 = SilentArgumentParser(prog=app, add_help=False, description='list archive contents, test archive')
     parser3.add_argument('--test', '-t', action='store_true')
     parser3.add_argument('--list', '-l', metavar='ARCHIVE', required=True, dest='archive')
-    
+
     # add common options
     for parser in (parser1, parser2, parser3):
         parser.add_argument("-v", "--verbosity", action="count", default=0,
@@ -767,7 +768,7 @@ def main():
         # --dry-run option was not handled here, it is handled in help_tester below
         parser.add_argument('--dry-run', '--simulate', help='do not run the command', dest='dry_run',
                             action='store_true')
-    
+
     # print help and exit if -h in options
     help_tester = SilentArgumentParser(add_help=False)
     help_tester.add_argument('-h', '--help', help='show all help', dest='help', nargs='?', const='cmd')
@@ -781,10 +782,10 @@ def main():
     elif args.help == 'markdown':
         print(__doc__)
         return 0
-    
+
     if args.dry_run:
         dry_run_patch()
-    
+
     # packer file1 [file2]... [--to output] [--format tgz]
     try:
         args = parser1.parse_args(argv_body)
@@ -797,7 +798,7 @@ def main():
         if args.format is None and args.archive is None:
             parser1.user_error('you must specify --to or --format')
             return 1
-        
+
         if args.format is None:
             # guess format by archive name
             args.format = get_format_by_filename(args.archive)
@@ -811,7 +812,7 @@ def main():
                     if len(args.inputs) > 1:
                         parser1.user_error('too many INPUTS')
                         return 1
-        
+
         if args.archive is None:
             if len(args.inputs) == 1:
                 # guess archive name by input file name
@@ -834,7 +835,7 @@ def main():
 
         args.format = format_normalize(args.format)
         return pack(args)
-    
+
     # packer -x archive --to dir/
     try:
         args = parser2.parse_args(argv_body)
@@ -844,7 +845,7 @@ def main():
     else:
         # run
         return unpack(args)
-    
+
     # packer [--test] --list archive
     try:
         args = parser3.parse_args(argv_body)
@@ -852,7 +853,7 @@ def main():
         pass
     else:
         return view(args)
-    
+
     # all parsers fail to parse, print usage and exit
     print_usage(app)
     print('Run `{} --help=markdown` to see full documentation.'.format(app))
