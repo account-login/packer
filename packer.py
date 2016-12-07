@@ -819,7 +819,7 @@ def main():
                 if args.inputs[0] == '-':
                     args.archive = '-'
                 else:
-                    args.archive = args.inputs[0] + '.' + args.format
+                    args.archive = os.path.normpath(args.inputs[0]) + '.' + args.format
             else:
                 if args.format not in filter_type:
                     # guess archive name by cwd
